@@ -59,11 +59,11 @@ sub do_arpnip {
   my $now = 'to_timestamp('. (join '.', gettimeofday) .')';
 
   # update node_ip with ARP and Neighbor Cache entries
-  store_arp(\%$_, $now) for @$v4;
+  store_arp($device->ip, \%$_, $now) for @$v4;
   debug sprintf ' [%s] arpnip - processed %s ARP Cache entries',
     $device->ip, scalar @$v4;
 
-  store_arp(\%$_, $now) for @$v6;
+  store_arp($device->ip, \%$_, $now) for @$v6;
   debug sprintf ' [%s] arpnip - processed %s IPv6 Neighbor Cache entries',
     $device->ip, scalar @$v6;
 
@@ -97,7 +97,7 @@ sub _get_arps {
   return $resolved_ips;
 }
 
-=head2 store_arp( \%host, $now? )
+=head2 store_arp($device_ip, \%host, $now? )
 
 Stores a new entry to the C<node_ip> table with the given MAC, IP (v4 or v6)
 and DNS host name. Host details are provided in a Hash ref:
@@ -116,12 +116,14 @@ C<time_last> timestamp, otherwise the current timestamp (C<now()>) is used.
 
 =cut
 
+
 sub store_arp {
-  my ($hash_ref, $now) = @_;
+  my ($device_ip, $hash_ref, $now) = @_;
   $now ||= 'now()';
   my $ip   = $hash_ref->{'ip'};
   my $mac  = NetAddr::MAC->new($hash_ref->{'node'});
   my $name = $hash_ref->{'dns'};
+
 
   return if !defined $mac or $mac->errstr;
 
@@ -144,8 +146,61 @@ sub store_arp {
         key => 'primary',
         for => 'update',
       });
+
+    if (setting('arpnip_track_l3device')){
+
+        # device_ip could actually be a hostname when passed from e.g. sshcollector
+        # so we try to resolve it and use this value if necessary
+        my $device_ip_resolved = ipv4_from_hostname($device_ip);
+
+        schema('netdisco')->resultset('NodeIpL3device')
+          ->update_or_create(
+          {
+            node_mac => $mac->as_ieee,
+            node_ip => $ip,
+            device_ip => $device_ip_resolved ? $device_ip_resolved : $device_ip,
+            time_last => \$now,
+          },
+          {
+            key => 'primary',
+            for => 'update',
+          });
+
+        }
   });
 }
+
+
+#sub store_arp {
+#  my ($hash_ref, $now) = @_;
+#  $now ||= 'now()';
+#  my $ip   = $hash_ref->{'ip'};
+#  my $mac  = NetAddr::MAC->new($hash_ref->{'node'});
+#  my $name = $hash_ref->{'dns'};
+#
+#  return if !defined $mac or $mac->errstr;
+#
+#  schema('netdisco')->txn_do(sub {
+#    my $current = schema('netdisco')->resultset('NodeIp')
+#      ->search(
+#        { ip => $ip, -bool => 'active'},
+#        { columns => [qw/mac ip/] })->update({active => \'false'});
+#
+#    schema('netdisco')->resultset('NodeIp')
+#      ->update_or_create(
+#      {
+#        mac => $mac->as_ieee,
+#        ip => $ip,
+#        dns => $name,
+#        active => \'true',
+#        time_last => \$now,
+#      },
+#      {
+#        key => 'primary',
+#        for => 'update',
+#      });
+#  });
+#}
 
 # gathers device subnets
 sub _gather_subnets {
