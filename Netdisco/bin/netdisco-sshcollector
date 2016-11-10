@@ -112,7 +112,7 @@ sub main {
         $stats{host}++;
         info sprintf ' [%s] arpnip - retrieved %s entries',
             $host->[0], scalar @{$host->[1]};
-        store_arpentries($host->[1]);
+        store_arpentries($host->[0], $host->[1]);
     }
 
     info sprintf 'arpnip - processed %s ARP Cache entries from %s devices',
@@ -140,7 +140,7 @@ sub process {
 }
 
 sub store_arpentries {
-    my ($arpentries) = @_;
+    my ($device_ip, $arpentries) = @_;
 
     foreach my $arpentry ( @$arpentries ) {
         # skip broadcast/vrrp/hsrp and other wierdos
@@ -148,7 +148,7 @@ sub store_arpentries {
 
         debug sprintf '  arpnip - stored entry: %s / %s',
             $arpentry->{mac}, $arpentry->{ip};
-        store_arp({
+        store_arp($device_ip, {
             node => $arpentry->{mac},
             ip => $arpentry->{ip},
             dns => $arpentry->{dns},

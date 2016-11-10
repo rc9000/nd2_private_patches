@@ -874,6 +874,14 @@ Value: Number. Default: 0.
 Sets the minimum amount of time in seconds which must elapse between any two
 arpnip jobs for a device.
 
+=head3 C<arpnip_track_l3device>
+
+Value: Boolean. Default: C<false>.
+
+If true, arpnip and sshcollector arp discover will populate the table 
+C<node_ip_l3device> with the tupple C<device_ip, node_ip, node_mac>. This
+allows to recreate where ARP entries come from.
+
 =head3 C<nbtstat_no>
 
 Value: List of Network Identifiers. Default: Empty List.
