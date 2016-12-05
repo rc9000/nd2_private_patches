@@ -1,0 +1,127 @@
+#!/usr/bin/env perl
+
+use warnings;
+use strict;
+
+our $home;
+my $use_node_ip_l3devicepatch = 1;
+
+BEGIN {
+  use FindBin;
+  FindBin::again();
+
+  $home = ($ENV{NETDISCO_HOME} || $ENV{HOME});
+
+  # try to find a localenv if one isn't already in place.
+  if (!exists $ENV{PERL_LOCAL_LIB_ROOT}) {
+      use File::Spec;
+      my $localenv = File::Spec->catfile($FindBin::RealBin, 'localenv');
+      exec($localenv, $0, @ARGV) if -f $localenv;
+      $localenv = File::Spec->catfile($home, 'perl5', 'bin', 'localenv');
+      exec($localenv, $0, @ARGV) if -f $localenv;
+
+      die "Sorry, can't find libs required for App::Netdisco.\n"
+        if !exists $ENV{PERLBREW_PERL};
+  }
+}
+
+BEGIN {
+  use Path::Class;
+
+  # stuff useful locations into @INC and $PATH
+  unshift @INC,
+    dir($FindBin::RealBin)->parent->subdir('lib')->stringify,
+    dir($FindBin::RealBin, 'lib')->stringify;
+
+  unshift @INC,
+    split m/:/, ($ENV{NETDISCO_INC} || '');
+
+  use Config;
+  $ENV{PATH} = $FindBin::RealBin . $Config{path_sep} . $ENV{PATH};
+}
+
+use App::Netdisco;
+use App::Netdisco::Core::Arpnip 'store_arp';
+use App::Netdisco::Util::Node 'check_mac';
+use App::Netdisco::Util::DNS 'hostnames_resolve_async';
+use Dancer ':script';
+use Pod::Usage;
+
+#use Module::Load ();
+
+use Getopt::Long;
+Getopt::Long::Configure ("bundling");
+
+my ($debug, $sqltrace, $ip, $mac, $l3dev) = (undef, 0, undef, undef, undef);
+my $result = GetOptions(
+  'ip|i=s'    => \$ip,
+  'mac|m=s'    => \$mac,
+  'l3device|l:s'    => \$l3dev,
+  'debug|D'    => \$debug,
+  'sqltrace|Q+'  => \$sqltrace,
+) or pod2usage(
+  -msg => 'error: bad options',
+  -verbose => 0,
+  -exitval => 1,
+);
+
+my $CONFIG = config();
+$CONFIG->{logger} = 'console';
+$CONFIG->{log} = ($debug ? 'debug' : 'info');
+$ENV{DBIC_TRACE} ||= $sqltrace;
+
+# reconfigure logging to force console output
+Dancer::Logger->init('console', $CONFIG);
+
+#this may be helpful with SSH issues:
+#$Net::OpenSSH::debug = ~0;
+
+exit main();
+
+sub main {
+
+    my $rec = [{ ip => $ip }];
+    hostnames_resolve_async($rec);
+    
+    if ($use_node_ip_l3devicepatch){
+        store_arp($l3dev, {
+            node => $mac,
+            ip => $ip,
+            dns => $rec->[0]->{dns},
+        });
+    }else{
+        store_arp({
+            node => $mac,
+            ip => $ip,
+            dns => $rec->[0]->{dns},
+        });
+    }
+}
+
+
+=head1 NAME
+
+netdisco-arpcli - Add node_ip entries to Netdisco manually
+
+=head1 SYNOPSIS
+
+ 
+ # insert or update an arp table entry
+ ~/bin/netdisco-arpcli [-DQ] -i 10.1.4.1 -m 00:18:ff:2a:0e:dd
+
+ # using node_ip_l3device extension to record l3device
+ ~/bin/netdisco-arpcli [-DQ] -i 10.1.4.138 -m 00:18:ff:2a:0e:dd -l 10.1.4.1
+
+=head1 DESCRIPTION
+
+Add node_ip entries to Netdisco manually
+
+=head1 DEPENDENCIES
+
+=over 4
+
+=item L<App::Netdisco>
+
+=back
+ 
+=cut
