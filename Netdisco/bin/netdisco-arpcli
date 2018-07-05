@@ -43,7 +43,7 @@ BEGIN {
 use App::Netdisco;
 use App::Netdisco::Core::Arpnip 'store_arp';
 use App::Netdisco::Util::Node 'check_mac';
-use App::Netdisco::Util::DNS 'hostnames_resolve_async';
+use App::Netdisco::Util::DNS 'hostname_from_ip';
 use Dancer ':script';
 use Pod::Usage;
 
@@ -81,19 +81,19 @@ exit main();
 sub main {
 
     my $rec = [{ ip => $ip }];
-    hostnames_resolve_async($rec);
-    
+    my $dnsname = hostname_from_ip($ip);
+
     if ($use_node_ip_l3devicepatch){
         store_arp($l3dev, {
             node => $mac,
             ip => $ip,
-            dns => $rec->[0]->{dns},
+            dns => $dnsname,
         });
     }else{
         store_arp({
             node => $mac,
             ip => $ip,
-            dns => $rec->[0]->{dns},
+            dns => $dnsname
         });
     }
 }
@@ -105,7 +105,7 @@ netdisco-arpcli - Add node_ip entries to Netdisco manually
 
 =head1 SYNOPSIS
 
- 
+
  # insert or update an arp table entry
  ~/bin/netdisco-arpcli [-DQ] -i 10.1.4.1 -m 00:18:ff:2a:0e:dd
 
@@ -123,5 +123,6 @@ Add node_ip entries to Netdisco manually
 =item L<App::Netdisco>
 
 =back
- 
+
 =cut
+
