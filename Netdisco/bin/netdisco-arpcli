@@ -4,7 +4,7 @@ use warnings;
 use strict;
 
 our $home;
-my $use_node_ip_l3devicepatch = 1;
+my $use_node_ip_l3devicepatch = 0;
 
 BEGIN {
   use FindBin;
@@ -41,13 +41,11 @@ BEGIN {
 }
 
 use App::Netdisco;
-use App::Netdisco::Core::Arpnip 'store_arp';
-use App::Netdisco::Util::Node 'check_mac';
+use App::Netdisco::Util::Node qw(check_mac store_arp);
 use App::Netdisco::Util::DNS 'hostname_from_ip';
 use Dancer ':script';
 use Pod::Usage;
 
-#use Module::Load ();
 
 use Getopt::Long;
 Getopt::Long::Configure ("bundling");
@@ -125,4 +123,5 @@ Add node_ip entries to Netdisco manually
 =back
 
 =cut
+
 
